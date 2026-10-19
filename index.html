@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>استوديو التعليق على الفيديوهات - PWA Edition</title>
+    
+    <!-- PWA & Mobile Meta Tags -->
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="رد الفعل">
+
+    <!-- Web App Manifest embedded inline -->
+    <link rel="manifest" id="manifestPlaceholder">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap');
+        body {
+            font-family: 'Cairo', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+        }
+        .cam-preview-container {
+            touch-action: none;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col justify-between selection:bg-purple-600 selection:text-white pb-6">
+
+    <header class="bg-gray-900 border-b border-gray-800 px-4 py-3 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-tr from-purple-600 to-pink-500 p-2.5 rounded-xl shadow-lg shadow-purple-900/30">
+                    <i class="fa-solid fa-video text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-none bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">صانع فيديوهات رد الفعل</h1>
+                    <p class="text-xs text-gray-400 mt-1">تطبيق ويب قابل للتثبيت (PWA)</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <!-- PWA Install Button (Shown dynamically) -->
+                <button id="pwaInstallBtn" class="hidden bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 transition shadow-lg shadow-emerald-900/30 animate-pulse">
+                    <i class="fa-solid fa-download"></i>
+                    <span>تثبيت التطبيق على الهاتف</span>
+                </button>
+
+                <button id="toggleHelpBtn" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 transition">
+                    <i class="fa-solid fa-circle-info text-purple-400"></i>
+                    <span>تعليمات</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Column: Media Stage -->
+        <div class="lg:col-span-8 flex flex-col gap-4">
+            
+            <div class="relative bg-black rounded-2xl overflow-hidden aspect-video border border-gray-800 shadow-2xl flex items-center justify-center group" id="viewport">
+                
+                <!-- Main Background Video -->
+                <video id="mainVideo" class="w-full h-full object-contain pointer-events-none" crossorigin="anonymous" playsinline></video>
+                
+                <!-- Placeholder UI -->
+                <div id="noVideoPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-gray-900/90 z-10 backdrop-blur-sm">
+                    <div class="w-20 h-20 bg-purple-900/30 border border-purple-500/30 rounded-full flex items-center justify-center text-purple-400 mb-4 animate-pulse">
+                        <i class="fa-solid fa-film text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">اختر فيديو للبدء بالتعليق عليه</h3>
+                    <p class="text-gray-400 text-sm max-w-md mb-6">اختر فيديو من جهازك أو استخدم فيديو تجريبي للبدء فوراً.</p>
+                    <div class="flex flex-wrap gap-3 justify-center">
+                        <label class="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-5 py-2.5 rounded-xl cursor-pointer transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
+                            <i class="fa-solid fa-upload"></i>
+                            <span>رفع فيديو من الجهاز</span>
+                            <input type="file" id="videoFileInput" accept="video/*" class="hidden">
+                        </label>
+                        <button id="loadSampleBtn" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 font-medium px-5 py-2.5 rounded-xl transition flex items-center gap-2">
+                            <i class="fa-solid fa-play text-pink-400"></i>
+                            <span>استخدام فيديو توضيحي</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Floating Front Camera Overlay -->
+                <div id="camOverlay" class="cam-preview-container absolute top-4 right-4 z-20 cursor-move border-2 border-purple-500 shadow-2xl overflow-hidden rounded-2xl transition-all duration-75 flex items-center justify-center group/cam" style="width: 140px; height: 140px;">
+                    <video id="camVideo" class="w-full h-full object-cover transform -scale-x-100 pointer-events-none" autoplay muted playsinline></video>
+                    
+                    <div id="camOffState" class="absolute inset-0 bg-gray-900/95 flex flex-col items-center justify-center text-gray-300 p-3 text-center">
+                        <i id="camStatusIcon" class="fa-solid fa-spinner animate-spin text-purple-400 text-2xl mb-2"></i>
+                        <span id="camStatusText" class="text-xs leading-relaxed">جاري تفعيل الكاميرا...</span>
+                        <button id="retryPermissionBtn" class="mt-2 bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg hidden hover:bg-purple-500 transition shadow">
+                            <i class="fa-solid fa-rotate-right ml-1"></i> السماح بالكاميرا
+                        </button>
+                    </div>
+
+                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover/cam:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none">
+                        <span class="text-xs text-white bg-black/60 px-2 py-1 rounded backdrop-blur"><i class="fa-solid fa-arrows-up-down-left-right"></i> اسحب للتحريك</span>
+                    </div>
+                </div>
+
+                <canvas id="exportCanvas" class="hidden"></canvas>
+            </div>
+
+            <!-- Video Player Controls Bar -->
+            <div class="bg-gray-900 border border-gray-800 p-4 rounded-2xl flex flex-col gap-3">
+                <div class="flex items-center gap-4">
+                    <button id="playPauseBtn" class="w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center transition shadow-md shrink-0">
+                        <i class="fa-solid fa-play"></i>
+                    </button>
+                    <span id="currentTime" class="text-xs font-mono text-gray-400 w-12">00:00</span>
+                    <input type="range" id="seekBar" value="0" min="0" max="100" class="w-full accent-purple-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer">
+                    <span id="durationTime" class="text-xs font-mono text-gray-400 w-12">00:00</span>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-4 bg-gray-900 border border-gray-800 p-4 rounded-2xl">
+                <div class="flex items-center gap-3">
+                    <button id="startRecordBtn" class="bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-red-900/30 flex items-center gap-2 text-sm">
+                        <span class="w-3 h-3 rounded-full bg-white animate-ping"></span>
+                        <span>بدء تسجيل رد الفعل</span>
+                    </button>
+                    <button id="stopRecordBtn" disabled class="bg-gray-800 text-gray-500 font-bold px-6 py-3 rounded-xl cursor-not-allowed flex items-center gap-2 text-sm transition">
+                        <i class="fa-solid fa-square"></i>
+                        <span>إيقاف وحفظ الفيديو</span>
+                    </button>
+                </div>
+                
+                <div class="flex items-center gap-2 text-xs text-gray-400">
+                    <i class="fa-solid fa-circle text-red-500 text-[10px]" id="recStatusDot" style="opacity: 0.3;"></i>
+                    <span id="recStatusText">جاهز للتسجيل</span>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="lg:col-span-4 flex flex-col gap-4">
+
+            <!-- Aspect Ratio Selector -->
+            <div class="bg-gray-900 border border-gray-800 p-5 rounded-2xl flex flex-col gap-3">
+                <h3 class="font-bold text-gray-200 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-mobile-screen-button text-purple-400"></i>
+                    <span>أبعاد الفيديو (ريلز / عادي)</span>
+                </h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="ratio169Btn" class="bg-purple-600/20 border-2 border-purple-500 text-purple-300 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition">
+                        <i class="fa-solid fa-desktop"></i>
+                        <span>أفقي (16:9)</span>
+                    </button>
+                    <button id="ratio916Btn" class="bg-gray-950 border border-gray-800 hover:border-gray-700 text-gray-400 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition">
+                        <i class="fa-solid fa-mobile-screen"></i>
+                        <span>ريلز / شورتس (9:16)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Customization Settings -->
+            <div class="bg-gray-900 border border-gray-800 p-5 rounded-2xl flex flex-col gap-5">
+                <h2 class="font-bold text-gray-200 flex items-center gap-2 border-b border-gray-800 pb-3">
+                    <i class="fa-solid fa-sliders text-purple-400"></i>
+                    <span>تخصيص الكاميرا</span>
+                </h2>
+
+                <!-- Toggle -->
+                <div class="flex items-center justify-between bg-gray-950 p-3 rounded-xl border border-gray-800">
+                    <span class="text-sm font-medium text-gray-300 flex items-center gap-2">
+                        <i class="fa-solid fa-eye text-gray-400"></i> إظهار الكاميرا
+                    </span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="camVisibleToggle" checked class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+
+                <!-- Size Slider -->
+                <div class="space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-300 font-medium"><i class="fa-solid fa-expand text-gray-400 ml-1"></i> حجم الكاميرا</span>
+                        <span id="camSizeVal" class="text-purple-400 font-mono text-xs">140px</span>
+                    </div>
+                    <input type="range" id="camSizeSlider" min="80" max="320" value="140" class="w-full accent-purple-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <!-- Shape Selector -->
+                <div class="space-y-2">
+                    <label class="text-sm text-gray-300 font-medium block"><i class="fa-solid fa-shapes text-gray-400 ml-1"></i> الشكل</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button data-shape="circle" class="shape-btn active bg-purple-600/20 border-2 border-purple-500 text-purple-300 py-2 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition">
+                            <div class="w-4 h-4 rounded-full border-2 border-current"></div>
+                            <span>دائري</span>
+                        </button>
+                        <button data-shape="rounded" class="shape-btn bg-gray-950 border border-gray-800 hover:border-gray-700 text-gray-400 py-2 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition">
+                            <div class="w-4 h-3 rounded-md border-2 border-current"></div>
+                            <span>منحني</span>
+                        </button>
+                        <button data-shape="square" class="shape-btn bg-gray-950 border border-gray-800 hover:border-gray-700 text-gray-400 py-2 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition">
+                            <div class="w-4 h-3 border-2 border-current"></div>
+                            <span>مربع</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Opacity -->
+                <div class="space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-300 font-medium"><i class="fa-solid fa-ghost text-gray-400 ml-1"></i> الشفافية</span>
+                        <span id="camOpacityVal" class="text-purple-400 font-mono text-xs">100%</span>
+                    </div>
+                    <input type="range" id="camOpacitySlider" min="20" max="100" value="100" class="w-full accent-purple-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <div id="helpModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-900 border border-gray-800 max-w-md w-full rounded-2xl p-6 relative shadow-2xl">
+            <button id="closeHelpBtn" class="absolute top-4 left-4 text-gray-400 hover:text-white text-xl">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-purple-600/20 p-3 rounded-xl border border-purple-500/30 text-purple-400">
+                    <i class="fa-solid fa-mobile-screen-button text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-white">طريقة التثبيت والاستخدام</h3>
+            </div>
+            <ul class="space-y-3 text-sm text-gray-300 pr-2 list-disc list-inside">
+                <li><strong class="text-emerald-400">لتثبيت التطبيق على الهاتف:</strong> اضغط على زر "تثبيت التطبيق" بالفي رأس الصفحة أو اختر من خيارات المتصفح (Chrome) ➔ <strong>"الإضافة إلى الشاشة الرئيسية"</strong>.</li>
+                <li><strong class="text-purple-400">تشغيل الكاميرا:</strong> تأكد من الموافقة على صلاحية الكاميرا والمايك عند التثبيت أو التشغيل لأول مرة.</li>
+                <li><strong class="text-purple-400">تنزيل الفيديو:</strong> بعد إيقاف التسجيل يتم تنزيل الفيديو مباشرة بصيغة WebM عالية الجودة على هاتفك.</li>
+            </ul>
+            <button id="gotItHelpBtn" class="w-full mt-6 bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 rounded-xl transition">
+                فهمت ذلك، ابدأ الآن
+            </button>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 border border-purple-500 text-white px-5 py-3 rounded-xl shadow-2xl z-50 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 pointer-events-none">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-purple-400"></i>
+        <span id="toastMsg" class="text-sm font-medium"></span>
+    </div>
+
+    <script>
+        // Dynamically inject Web App Manifest JSON for PWA installation
+        const manifestObj = {
+            "name": "صانع فيديوهات رد الفعل",
+            "short_name": "رد الفعل",
+            "start_url": "./",
+            "display": "standalone",
+            "background_color": "#0f172a",
+            "theme_color": "#0f172a",
+            "icons": [
+                {
+                    "src": "https://cdn-icons-png.flaticon.com/512/1179/1179069.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                }
+            ]
+        };
+        // Fix Unicode/Arabic character encoding issue with btoa
+        const manifestJsonStr = JSON.stringify(manifestObj);
+        const manifestBase64 = btoa(unescape(encodeURIComponent(manifestJsonStr)));
+        const manifestStr = 'data:application/manifest+json;base64,' + manifestBase64;
+        document.getElementById('manifestPlaceholder').setAttribute('href', manifestStr);
+
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swCode = `
+                    self.addEventListener('install', (e) => e.waitUntil(self.skipWaiting()));
+                    self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+                    self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
+                `;
+                const blob = new Blob([swCode], { type: 'text/javascript' });
+                navigator.serviceWorker.register(URL.createObjectURL(blob))
+                    .then(() => console.log('PWA ServiceWorker Active'))
+                    .catch(err => console.warn('SW register fail:', err));
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const mainVideo = document.getElementById('mainVideo');
+            const camVideo = document.getElementById('camVideo');
+            const camOverlay = document.getElementById('camOverlay');
+            const camOffState = document.getElementById('camOffState');
+            const camStatusIcon = document.getElementById('camStatusIcon');
+            const camStatusText = document.getElementById('camStatusText');
+            const retryPermissionBtn = document.getElementById('retryPermissionBtn');
+            const viewport = document.getElementById('viewport');
+            const noVideoPlaceholder = document.getElementById('noVideoPlaceholder');
+            const exportCanvas = document.getElementById('exportCanvas');
+            const ctx = exportCanvas.getContext('2d');
+
+            // Controls
+            const camVisibleToggle = document.getElementById('camVisibleToggle');
+            const camSizeSlider = document.getElementById('camSizeSlider');
+            const camSizeVal = document.getElementById('camSizeVal');
+            const camOpacitySlider = document.getElementById('camOpacitySlider');
+            const camOpacityVal = document.getElementById('camOpacityVal');
+            const shapeBtns = document.querySelectorAll('.shape-btn');
+
+            // Playback & Record
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            const seekBar = document.getElementById('seekBar');
+            const currentTimeEl = document.getElementById('currentTime');
+            const durationTimeEl = document.getElementById('durationTime');
+            const startRecordBtn = document.getElementById('startRecordBtn');
+            const stopRecordBtn = document.getElementById('stopRecordBtn');
+            const recStatusDot = document.getElementById('recStatusDot');
+            const recStatusText = document.getElementById('recStatusText');
+
+            // Inputs
+            const videoFileInput = document.getElementById('videoFileInput');
+            const loadSampleBtn = document.getElementById('loadSampleBtn');
+
+            // Ratio
+            const ratio169Btn = document.getElementById('ratio169Btn');
+            const ratio916Btn = document.getElementById('ratio916Btn');
+            let isVerticalReelsMode = false;
+
+            // PWA Install Prompt
+            const pwaInstallBtn = document.getElementById('pwaInstallBtn');
+            let deferredPrompt = null;
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                pwaInstallBtn.classList.remove('hidden');
+            });
+
+            pwaInstallBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        showToast('شُكراً لتثبيت التطبيق! 🎉');
+                    }
+                    deferredPrompt = null;
+                    pwaInstallBtn.classList.add('hidden');
+                }
+            });
+
+            // Help Modal
+            const helpModal = document.getElementById('helpModal');
+            const toggleHelpBtn = document.getElementById('toggleHelpBtn');
+            const closeHelpBtn = document.getElementById('closeHelpBtn');
+            const gotItHelpBtn = document.getElementById('gotItHelpBtn');
+
+            // State Variables
+            let camStream = null;
+            let isCamActive = false;
+            let currentShape = 'circle';
+            let mediaRecorder = null;
+            let recordedChunks = [];
+            let isRecording = false;
+            let renderAnimFrame = null;
+
+            function showToast(msg, iconClass = 'fa-solid fa-circle-check text-purple-400') {
+                const toast = document.getElementById('toast');
+                const toastMsg = document.getElementById('toastMsg');
+                const toastIcon = document.getElementById('toastIcon');
+                
+                toastMsg.textContent = msg;
+                toastIcon.className = iconClass;
+                
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+
+                setTimeout(() => {
+                    toast.classList.remove('translate-y-0', 'opacity-100');
+                    toast.classList.add('translate-y-20', 'opacity-0');
+                }, 4000);
+            }
+
+            async function initCameraAuto() {
+                camStatusIcon.className = "fa-solid fa-spinner animate-spin text-purple-400 text-2xl mb-2";
+                camStatusText.textContent = "جاري الاتصال بالكاميرا والمايك...";
+                retryPermissionBtn.classList.add('hidden');
+
+                if (camStream) {
+                    camStream.getTracks().forEach(track => track.stop());
+                }
+
+                try {
+                    camStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+                        audio: true
+                    });
+                    camVideo.srcObject = camStream;
+                    camVideo.onloadedmetadata = () => camVideo.play();
+                    camOffState.classList.add('hidden');
+                    isCamActive = true;
+                    showToast('تم تفعيل الكاميرا والمايك بنجاح 🎉');
+                } catch (err) {
+                    console.warn('Cam error:', err);
+                    isCamActive = false;
+                    camStatusIcon.className = "fa-solid fa-triangle-exclamation text-amber-400 text-2xl mb-2";
+                    camStatusText.textContent = "يرجى منح إذن الكاميرا من المتصفح.";
+                    retryPermissionBtn.classList.remove('hidden');
+                }
+            }
+
+            initCameraAuto();
+            retryPermissionBtn.addEventListener('click', initCameraAuto);
+
+            // Controls logic
+            camSizeSlider.addEventListener('input', (e) => {
+                const val = e.target.value;
+                camOverlay.style.width = `${val}px`;
+                camOverlay.style.height = `${val}px`;
+                camSizeVal.textContent = `${val}px`;
+            });
+
+            camVisibleToggle.addEventListener('change', (e) => {
+                camOverlay.classList.toggle('hidden', !e.target.checked);
+            });
+
+            camOpacitySlider.addEventListener('input', (e) => {
+                camOverlay.style.opacity = e.target.value / 100;
+                camOpacityVal.textContent = `${e.target.value}%`;
+            });
+
+            shapeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    shapeBtns.forEach(b => {
+                        b.classList.remove('active', 'bg-purple-600/20', 'border-purple-500', 'text-purple-300');
+                        b.classList.add('bg-gray-950', 'border-gray-800', 'text-gray-400');
+                    });
+                    btn.classList.add('active', 'bg-purple-600/20', 'border-purple-500', 'text-purple-300');
+                    currentShape = btn.dataset.shape;
+                    camOverlay.classList.remove('rounded-full', 'rounded-2xl', 'rounded-none');
+
+                    if (currentShape === 'circle') camOverlay.classList.add('rounded-full');
+                    else if (currentShape === 'rounded') camOverlay.classList.add('rounded-2xl');
+                    else camOverlay.classList.add('rounded-none');
+                });
+            });
+            camOverlay.classList.add('rounded-full');
+
+            // Aspect Ratio
+            ratio169Btn.addEventListener('click', () => {
+                isVerticalReelsMode = false;
+                viewport.classList.remove('aspect-[9/16]');
+                viewport.classList.add('aspect-video');
+                ratio169Btn.className = "bg-purple-600/20 border-2 border-purple-500 text-purple-300 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition";
+                ratio916Btn.className = "bg-gray-950 border border-gray-800 hover:border-gray-700 text-gray-400 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition";
+                showToast('الأبعاد أفقية (16:9)');
+            });
+
+            ratio916Btn.addEventListener('click', () => {
+                isVerticalReelsMode = true;
+                viewport.classList.remove('aspect-video');
+                viewport.classList.add('aspect-[9/16]');
+                ratio916Btn.className = "bg-purple-600/20 border-2 border-purple-500 text-purple-300 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition";
+                ratio169Btn.className = "bg-gray-950 border border-gray-800 hover:border-gray-700 text-gray-400 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition";
+                showToast('أبعاد ريلز (9:16)');
+            });
+
+            function loadVideoSource(fileOrUrl) {
+                try {
+                    mainVideo.pause();
+                    mainVideo.crossOrigin = "anonymous";
+                    mainVideo.src = typeof fileOrUrl === 'string' ? fileOrUrl : URL.createObjectURL(fileOrUrl);
+                    noVideoPlaceholder.classList.add('hidden');
+                    mainVideo.load();
+                    showToast('تم تحميل الفيديو بنجاح');
+                } catch (err) {
+                    showToast('خطأ في تحميل الفيديو', 'fa-solid fa-circle-xmark text-red-400');
+                }
+            }
+
+            videoFileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) loadVideoSource(e.target.files[0]);
+            });
+
+            const sampleUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
+            loadSampleBtn.addEventListener('click', () => loadVideoSource(sampleUrl));
+
+            playPauseBtn.addEventListener('click', async () => {
+                if (!mainVideo.src) return showToast('اختر فيديو أولاً!');
+                if (mainVideo.paused) {
+                    await mainVideo.play();
+                    playPauseBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                } else {
+                    mainVideo.pause();
+                    playPauseBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+                }
+            });
+
+            mainVideo.addEventListener('timeupdate', () => {
+                if (!mainVideo.duration) return;
+                seekBar.value = (mainVideo.currentTime / mainVideo.duration) * 100;
+                currentTimeEl.textContent = formatTime(mainVideo.currentTime);
+                durationTimeEl.textContent = formatTime(mainVideo.duration);
+            });
+
+            seekBar.addEventListener('input', (e) => {
+                if (mainVideo.duration) mainVideo.currentTime = (e.target.value / 100) * mainVideo.duration;
+            });
+
+            function formatTime(sec) {
+                const m = Math.floor(sec / 60);
+                const s = Math.floor(sec % 60);
+                return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            }
+
+            // Render Composition Canvas
+            function startCanvasComposition() {
+                exportCanvas.width = isVerticalReelsMode ? 1080 : (mainVideo.videoWidth || 1280);
+                exportCanvas.height = isVerticalReelsMode ? 1920 : (mainVideo.videoHeight || 720);
+
+                function renderFrame() {
+                    if (!isRecording) return;
+
+                    ctx.fillStyle = "#000000";
+                    ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+                    if (mainVideo.readyState >= 2) {
+                        if (isVerticalReelsMode) {
+                            const aspect = mainVideo.videoWidth / mainVideo.videoHeight || (16 / 9);
+                            let drawW = exportCanvas.width;
+                            let drawH = exportCanvas.width / aspect;
+                            let drawY = (exportCanvas.height - drawH) / 2;
+                            ctx.drawImage(mainVideo, 0, drawY, drawW, drawH);
+                        } else {
+                            ctx.drawImage(mainVideo, 0, 0, exportCanvas.width, exportCanvas.height);
+                        }
+                    }
+
+                    if (camVisibleToggle.checked && isCamActive && camVideo.readyState >= 2) {
+                        const vpRect = viewport.getBoundingClientRect();
+                        const camRect = camOverlay.getBoundingClientRect();
+
+                        const scaleX = exportCanvas.width / vpRect.width;
+                        const scaleY = exportCanvas.height / vpRect.height;
+
+                        const x = (camRect.left - vpRect.left) * scaleX;
+                        const y = (camRect.top - vpRect.top) * scaleY;
+                        const w = camRect.width * scaleX;
+                        const h = camRect.height * scaleY;
+
+                        ctx.save();
+                        ctx.globalAlpha = camOpacitySlider.value / 100;
+                        ctx.beginPath();
+                        if (currentShape === 'circle') ctx.arc(x + w / 2, y + h / 2, w / 2, 0, Math.PI * 2);
+                        else if (currentShape === 'rounded') ctx.roundRect(x, y, w, h, 20 * scaleX);
+                        else ctx.rect(x, y, w, h);
+                        ctx.clip();
+
+                        ctx.translate(x + w, y);
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(camVideo, 0, 0, w, h);
+                        ctx.restore();
+                    }
+
+                    renderAnimFrame = requestAnimationFrame(renderFrame);
+                }
+
+                renderFrame();
+            }
+
+            startRecordBtn.addEventListener('click', async () => {
+                if (!mainVideo.src) return showToast('اختر فيديو للتعليق عليه أولاً!');
+                if (!isCamActive) await initCameraAuto();
+
+                recordedChunks = [];
+                isRecording = true;
+
+                mainVideo.currentTime = 0;
+                await mainVideo.play();
+                playPauseBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+
+                startCanvasComposition();
+
+                const canvasStream = exportCanvas.captureStream(30);
+                const tracks = [...canvasStream.getVideoTracks()];
+
+                // Audio track mixing
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const dest = audioCtx.createMediaStreamDestination();
+
+                    if (camStream && camStream.getAudioTracks().length > 0) {
+                        audioCtx.createMediaStreamSource(camStream).connect(dest);
+                    }
+                    if (dest.stream.getAudioTracks().length > 0) {
+                        tracks.push(dest.stream.getAudioTracks()[0]);
+                    }
+                } catch (e) {
+                    if (camStream && camStream.getAudioTracks().length > 0) {
+                        tracks.push(camStream.getAudioTracks()[0]);
+                    }
+                }
+
+                const finalStream = new MediaStream(tracks);
+                mediaRecorder = new MediaRecorder(finalStream, { mimeType: 'video/webm' });
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = exportRecordedVideo;
+                mediaRecorder.start(200);
+
+                recStatusDot.style.opacity = '1';
+                recStatusDot.classList.add('animate-ping');
+                recStatusText.textContent = 'جاري تسجيل رد الفعل...';
+                startRecordBtn.disabled = true;
+                startRecordBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                stopRecordBtn.disabled = false;
+                stopRecordBtn.classList.remove('cursor-not-allowed', 'bg-gray-800', 'text-gray-500');
+                stopRecordBtn.classList.add('bg-purple-600', 'hover:bg-purple-500', 'text-white', 'shadow-lg');
+
+                showToast('بدأ التسجيل! تحدث وعلّق الآن');
+            });
+
+            stopRecordBtn.addEventListener('click', () => {
+                if (!isRecording) return;
+                isRecording = false;
+
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+
+                mainVideo.pause();
+                playPauseBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+                cancelAnimationFrame(renderAnimFrame);
+
+                recStatusDot.style.opacity = '0.3';
+                recStatusDot.classList.remove('animate-ping');
+                recStatusText.textContent = 'تم إيقاف التسجيل';
+
+                startRecordBtn.disabled = false;
+                startRecordBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                stopRecordBtn.disabled = true;
+                stopRecordBtn.classList.add('cursor-not-allowed', 'bg-gray-800', 'text-gray-500');
+                stopRecordBtn.classList.remove('bg-purple-600', 'hover:bg-purple-500', 'text-white', 'shadow-lg');
+            });
+
+            function exportRecordedVideo() {
+                if (!recordedChunks.length) return showToast('لم يتم تسجيل بيانات');
+
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `reaction-video-${Date.now()}.webm`;
+                document.body.appendChild(a);
+                a.click();
+
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 2000);
+
+                showToast('تم حفظ الفيديو وتنزيله بنجاح! 🎉');
+            }
+
+            toggleHelpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+            closeHelpBtn.addEventListener('click', () => helpModal.classList.add('hidden'));
+            gotItHelpBtn.addEventListener('click', () => helpModal.classList.add('hidden'));
+        });
+    </script>
+</body>
+</html>
